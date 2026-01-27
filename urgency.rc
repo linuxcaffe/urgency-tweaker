@@ -1,0 +1,4 @@
+urgency.age.max=365
+urgency.uda.edate.coefficient=2
+urgency.inherit=1
+urgency.uda.priority.L.coefficient=-2
