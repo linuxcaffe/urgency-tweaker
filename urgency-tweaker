@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+
+import curses
+import subprocess
+import sys
+from pathlib import Path
+
+# ----------------------------
+# paths
+# ----------------------------
+
+TASK_DIR = Path.home() / ".task"
+CONFIG_DIR = TASK_DIR / "config"
+USER_RC = CONFIG_DIR / "urgency.rc"
+
+# ----------------------------
+# Taskwarrior urgency defaults
+# ----------------------------
+
+DEFAULT_URGENCY = {
+    "urgency.age": 2.0,
+    "urgency.annotations": 1.0,
+    "urgency.blocked": -5.0,
+    "urgency.blocking": 5.0,
+    "urgency.due": 12.0,
+    "urgency.project": 1.0,
+    "urgency.scheduled": 5.0,
+    "urgency.tags": 1.0,
+    "urgency.priority.H": 6.0,
+    "urgency.priority.M": 3.0,
+    "urgency.priority.L": 1.0,
+    "urgency.waiting": -3.0,
+}
+
+# ----------------------------
+# rc parsing / writing
+# ----------------------------
+
+def parse_rc(path: Path) -> dict:
+    data = {}
+    if not path.exists():
+        return data
+
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        try:
+            data[k.strip()] = float(v.strip())
+        except ValueError:
+            continue
+    return data
+
+
+def write_user_rc(data: dict):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    lines = [
+        f"{k}={v}"
+        for k, v in sorted(data.items())
+    ]
+
+    USER_RC.write_text("\n".join(lines) + "\n")
+
+
+# ----------------------------
+# UDA discovery
+# ----------------------------
+
+def discover_udas():
+    udas = []
+    try:
+        out = subprocess.check_output(
+            ["task", "show"], text=True, stderr=subprocess.DEVNULL
+        )
+        for line in out.splitlines():
+            if line.startswith("uda.") and line.endswith(".type"):
+                name = line.split(".")[1]
+                udas.append(f"urgency.uda.{name}")
+    except Exception:
+        pass
+    return udas
+
+
+# ----------------------------
+# data preparation
+# ----------------------------
+
+def load_coeffs(categories):
+    # start from immutable defaults
+    coeffs = dict(DEFAULT_URGENCY)
+
+    # overlay user config if present
+    coeffs.update(parse_rc(USER_RC))
+
+    # add UDAs dynamically (default = 0)
+    for uda in discover_udas():
+        coeffs.setdefault(uda, 0.0)
+
+    # optional category filtering
+    if categories:
+        coeffs = {
+            k: v for k, v in coeffs.items()
+            if any(k.startswith(f"urgency.{c}") for c in categories)
+        }
+
+    return coeffs
+
+
+def is_modified(key, value):
+    return value != DEFAULT_URGENCY.get(key, 0.0)
+
+
+# ----------------------------
+# curses UI
+# ----------------------------
+
+def ui(stdscr, coeffs):
+    curses.curs_set(0)
+    stdscr.keypad(True)
+
+    keys = sorted(coeffs.keys())
+    selected = 0
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+
+        header = "urgency-tweaker  ↑↓ move  ←→ change   * modified   q quit"
+        stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
+
+        for i, k in enumerate(keys):
+            y = i + 2
+            if y >= h:
+                break
+
+            val = coeffs[k]
+            marker = "*" if is_modified(k, val) else " "
+            line = f"{k:<30} {val:>6.1f} {marker}"
+
+            if i == selected:
+                stdscr.addstr(y, 0, line[:w], curses.A_REVERSE)
+            else:
+                stdscr.addstr(y, 0, line[:w])
+
+        stdscr.refresh()
+        ch = stdscr.getch()
+
+        if ch in (ord("q"), ord("Q")):
+            break
+        elif ch == curses.KEY_UP and selected > 0:
+            selected -= 1
+        elif ch == curses.KEY_DOWN and selected < len(keys) - 1:
+            selected += 1
+        elif ch == curses.KEY_LEFT:
+            coeffs[keys[selected]] -= 1
+        elif ch == curses.KEY_RIGHT:
+            coeffs[keys[selected]] += 1
+
+    return coeffs
+
+
+# ----------------------------
+# main
+# ----------------------------
+
+def main():
+    categories = sys.argv[1:]
+
+    coeffs = load_coeffs(categories)
+    if not coeffs:
+        print("No matching urgency coefficients.")
+        sys.exit(1)
+
+    final = curses.wrapper(ui, coeffs)
+    write_user_rc(final)
+
+
+if __name__ == "__main__":
+    main()
+
