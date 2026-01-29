@@ -56,8 +56,63 @@ This project exists to make that experimentation fast, visible, and reversible
 
 Result:
 
-```ini
+
 urgency.project.work=5.0
 urgency.priority.H=3.0
 urgency.tag.waiting=-2.0
+
+
+
+Include this file from .taskrc and continue using Taskwarrior normally.
+Installation
+
+This project is currently in early development.
+
+For now, clone the repository and run directly from source:
+
+git clone https://github.com/linuxcaffe/urgency-tweaker
+cd urgency-tweaker
+
+See DEVELOPERS.md
+for development setup and dependencies.
+Usage
+
+urgency-tweaker
+
+The interface is keyboard-driven and intended for terminal users comfortable
+with Taskwarrior concepts.
+
+Detailed key bindings and interaction notes will live in docs/.
+Project status
+
+⚠️ Early / experimental
+
+    Functionality is incomplete
+
+    Interfaces may change
+
+    Configuration format is not yet stable
+
+This project is currently best suited for curious users and contributors.
+Further reading
+
+    DEVELOPERS.md
+    — architecture, internals, design notes
+
+    CONTRIBUTING.md
+    — how to help, workflow, expectations
+
+    docs/ — extended examples and usage notes (planned)
+
+Metadata
+
+    License: MIT
+
+    Language: Python
+
+    Interface: ncurses (TUI)
+
+    Platforms: Linux
+
+
 
