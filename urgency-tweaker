@@ -56,13 +56,26 @@ def parse_rc(path: Path) -> dict:
 def write_user_rc(data: dict):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-    lines = [
-        f"{k}={v}"
-        for k, v in sorted(data.items())
-    ]
+    lines = []
 
-    USER_RC.write_text("\n".join(lines) + "\n")
+    for k in sorted(data.keys()):
+        v = data[k]
 
+        # known default?
+        if k in DEFAULT_URGENCY:
+            default = DEFAULT_URGENCY[k]
+            if v != default:
+                line = f"{k}={v}    # default={default}"
+            else:
+                line = f"{k}={v}"
+        else:
+            # no known default (e.g. UDA)
+            line = f"{k}={v}"
+
+        lines.append(line)
+
+    content = RC_HEADER + "\n".join(lines) + "\n"
+    USER_RC.write_text(content)
 
 # ----------------------------
 # UDA discovery
